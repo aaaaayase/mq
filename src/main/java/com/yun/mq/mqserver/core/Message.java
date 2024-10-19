@@ -1,7 +1,5 @@
 package com.yun.mq.mqserver.core;
 
-import lombok.Getter;
-import lombok.Setter;
 
 import java.io.Serializable;
 import java.util.UUID;
@@ -17,8 +15,7 @@ import java.util.stream.IntStream;
  * 需要对message进行序列化以及反序列化
  * 此处使用标准库自带的序列化/反序列化
  */
-@Setter
-@Getter
+
 public class Message implements Serializable {
 
     // 这两个属性时最核心的部分 其它属性用于辅助
@@ -82,4 +79,43 @@ public class Message implements Serializable {
     }
 
 
+    public BasicProperties getBasicProperties() {
+        return basicProperties;
+    }
+
+    public void setBasicProperties(BasicProperties basicProperties) {
+        this.basicProperties = basicProperties;
+    }
+
+    public byte[] getBody() {
+        return body;
+    }
+
+    public void setBody(byte[] body) {
+        this.body = body;
+    }
+
+    public long getOffsetBeg() {
+        return offsetBeg;
+    }
+
+    public void setOffsetBeg(long offsetBeg) {
+        this.offsetBeg = offsetBeg;
+    }
+
+    public long getOffsetEnd() {
+        return offsetEnd;
+    }
+
+    public void setOffsetEnd(long offsetEnd) {
+        this.offsetEnd = offsetEnd;
+    }
+
+    public byte getIsValid() {
+        return isValid;
+    }
+
+    public void setIsValid(byte isValid) {
+        this.isValid = isValid;
+    }
 }

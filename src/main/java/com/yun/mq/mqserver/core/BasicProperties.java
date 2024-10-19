@@ -1,8 +1,5 @@
 package com.yun.mq.mqserver.core;
 
-import lombok.Getter;
-import lombok.Setter;
-
 import java.io.Serializable;
 
 /**
@@ -10,8 +7,6 @@ import java.io.Serializable;
  * @date 2024/10/18 20:25
  * @desciption: 消息属性
  */
-@Setter
-@Getter
 public class BasicProperties implements Serializable {
 
     // 消息的标识 使用UUID来生成
@@ -27,4 +22,28 @@ public class BasicProperties implements Serializable {
 
     // 其它属性暂不去考虑
 
+
+    public String getMessageId() {
+        return messageId;
+    }
+
+    public void setMessageId(String messageId) {
+        this.messageId = messageId;
+    }
+
+    public String getRoutingKey() {
+        return routingKey;
+    }
+
+    public void setRoutingKey(String routingKey) {
+        this.routingKey = routingKey;
+    }
+
+    public int getDeliverMode() {
+        return deliverMode;
+    }
+
+    public void setDeliverMode(int deliverMode) {
+        this.deliverMode = deliverMode;
+    }
 }
