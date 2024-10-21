@@ -1,5 +1,10 @@
 package com.yun.mq.mqserver.datacenter;
 
+import com.yun.mq.common.BinaryTool;
+import com.yun.mq.common.MqException;
+import com.yun.mq.mqserver.core.MSGQueue;
+import com.yun.mq.mqserver.core.Message;
+
 import java.io.*;
 import java.util.Scanner;
 
@@ -125,4 +130,70 @@ public class MessageFileManager {
         }
         return true;
     }
+
+    // 将消息写入文件
+    private void sendMessage(MSGQueue queue, Message message) throws MqException, IOException {
+        // 1. 验证要写入的文件是否存在
+        if (!checkFilesExists(queue.getName())) {
+            throw new MqException("[MessageFileManager] 队列对应的文件不存在！ queueName=" + queue.getName());
+        }
+
+        // 2. 将message对象进行序列化 转为二进制字节数组
+        byte[] messageBinary = BinaryTool.toBytes(message);
+
+        synchronized (queue) {
+            // 3. 写入文件之前先更新message中的offset属性值
+            File queueDataFile = new File(getQueueDataPath(queue.getName()));
+            message.setOffsetBeg(queueDataFile.length() + 4);
+            message.setOffsetEnd(queueDataFile.length() + 4 + messageBinary.length);
+
+            // 4. 写入文件
+            try (OutputStream outputStream = new FileOutputStream(queueDataFile, true)) {
+                // 这里使用到DataOutputStream类是因为要写入4个字节长度的消息长度 如果直接outputstream调用write写入就是一个字节
+                try (DataOutputStream dataOutputStream = new DataOutputStream(outputStream)) {
+                    // 写入消息长度
+                    dataOutputStream.writeInt(messageBinary.length);
+                    // 写入消息本体
+                    dataOutputStream.write(messageBinary);
+                }
+            }
+
+            // 5. 更新消息统计文件
+            Stat stat = readStat(queue.getName());
+            stat.totalCount += 1;
+            stat.validCount += 1;
+            writeStat(queue.getName(), stat);
+        }
+    }
+
+    // 删除消息
+    private void deleteMessage(MSGQueue queue, Message message) throws IOException, ClassNotFoundException {
+        synchronized (queue) {
+            try (RandomAccessFile randomAccessFile = new RandomAccessFile(getQueueStatPath(queue.getName()), "rw")) {
+                // 1. 从文件中将相应message读取出来
+                byte[] bufferSrc = new byte[(int) (message.getOffsetEnd() - message.getOffsetBeg())];
+                randomAccessFile.seek(message.getOffsetBeg());
+                randomAccessFile.read(bufferSrc);
+                Message diskMessage = (Message) BinaryTool.fromBytes(bufferSrc);
+
+                // 2. 修改diskMessage中的isValid字段
+                // 此处无需给参数中的message中的isValid也进行设置 因为在我们删硬盘中的message的情况时内存中的message也是要删的 所以无需再去修改它的属性了
+                diskMessage.setIsValid((byte) 0x00);
+
+                // 3. 重新将对象写回文件
+                randomAccessFile.seek(message.getOffsetBeg());
+                byte[] bufferDest = BinaryTool.toBytes(diskMessage);
+                randomAccessFile.write(bufferDest);
+            }
+
+            // 更新统计文件
+            Stat stat = readStat(queue.getName());
+            if (stat.validCount > 0) {
+                stat.validCount -= 1;
+            }
+            writeStat(queue.getName(), stat);
+        }
+
+    }
+
 }
