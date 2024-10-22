@@ -6,6 +6,7 @@ import com.yun.mq.mqserver.core.MSGQueue;
 import com.yun.mq.mqserver.core.Message;
 
 import java.io.*;
+import java.util.LinkedList;
 import java.util.Scanner;
 
 /**
@@ -194,6 +195,48 @@ public class MessageFileManager {
             writeStat(queue.getName(), stat);
         }
 
+    }
+
+    // 加载对应队列中的消息到内存中 准确来说就是链表
+    // 这里使用链表是为了方便操作
+    // 这里的操作不需要加锁 因为这是在启动服务器时执行的操作 所以此时还没有用户请求不需要考虑冲突的情况
+    public LinkedList<Message> LoadAllMessageFromQueue(String queueName) throws IOException, MqException, ClassNotFoundException {
+        LinkedList<Message> messages = new LinkedList<>();
+        try (InputStream inputStream = new FileInputStream(getQueueDataPath(queueName))) {
+            try (DataInputStream dataOutputStream = new DataInputStream(inputStream)) {
+                // 设置变量记录文件中的光标
+                long currentOffset = 0;
+                // 使用循环把文件中的消息全部读出来转为内存中的对象
+                while (true) {
+                    // 1. 先读取消息长度 这一步可能会读到文件尾 读到文件尾会抛出EOFException异常
+                    int messageSize = dataOutputStream.readInt();
+                    // 2. 读出的消息先装到数组
+                    byte[] buffer = new byte[messageSize];
+                    int actualSize = dataOutputStream.read(buffer);
+                    //判断记录的消息长度是否和读出来的长度相等 不相等则抛异常
+                    if (actualSize != messageSize) {
+                        throw new MqException("[MessageFileManager] 文件格式错误！ queueName=" + queueName);
+                    }
+                    // 3. 反序列化为对象
+                    Message message = (Message) BinaryTool.fromBytes(buffer);
+                    // 4. 验证对象是否有效
+                    if (message.getIsValid() != 0x01) {
+                        // 即使对象无效 读取后文件中光标也移动了
+                        currentOffset += (4 + messageSize);
+                        continue;
+                    }
+                    // 5. 计算起始offset以及终止offset
+                    message.setOffsetBeg(currentOffset + 4);
+                    message.setOffsetEnd(currentOffset + 4 + messageSize);
+                    currentOffset += (4 + messageSize);
+                    messages.add(message);
+                }
+            }
+        } catch (EOFException e) {
+            // 这里的catch不是为了去捕捉异常 而是这里的流对象读到文件尾会抛出异常 因此抓到相应异常就代表文件读取已经结束了
+            System.out.println("[MessageFileManager] 恢复Message数据完成！");
+        }
+        return messages;
     }
 
 }
