@@ -5,7 +5,7 @@ import com.yun.mq.common.MqException;
 import com.yun.mq.mqserver.core.MSGQueue;
 import com.yun.mq.mqserver.core.Message;
 
-import javax.xml.crypto.Data;
+
 import java.io.*;
 import java.util.LinkedList;
 import java.util.Scanner;
@@ -60,7 +60,7 @@ public class MessageFileManager {
         // 使用OutputStream默认情况下会清空文件内容之后再写入 除非设置append为true
         try (OutputStream outputStream = new FileOutputStream(getQueueStatPath(queueName))) {
             PrintWriter printWriter = new PrintWriter(outputStream);
-            printWriter.write(stat.totalCount + "/t" + stat.validCount);
+            printWriter.write(stat.totalCount + "\t" + stat.validCount);
             printWriter.flush();
 
         } catch (IOException e) {
@@ -114,7 +114,7 @@ public class MessageFileManager {
         File baseDir = new File(getQueueDir(queueName));
         boolean ok3 = baseDir.delete();
 
-        if (ok2 || ok1 || ok3) {
+        if (!ok2 || !ok1 || !ok3) {
             // 有一个删除失败则算做整体删除失败
             throw new IOException("删除队列的消息目录及文件失败！ baseDir=" + baseDir.getAbsolutePath());
         }
@@ -171,7 +171,7 @@ public class MessageFileManager {
     // 删除消息
     public void deleteMessage(MSGQueue queue, Message message) throws IOException, ClassNotFoundException {
         synchronized (queue) {
-            try (RandomAccessFile randomAccessFile = new RandomAccessFile(getQueueStatPath(queue.getName()), "rw")) {
+            try (RandomAccessFile randomAccessFile = new RandomAccessFile(getQueueDataPath(queue.getName()), "rw")) {
                 // 1. 从文件中将相应message读取出来
                 byte[] bufferSrc = new byte[(int) (message.getOffsetEnd() - message.getOffsetBeg())];
                 randomAccessFile.seek(message.getOffsetBeg());
@@ -183,8 +183,8 @@ public class MessageFileManager {
                 diskMessage.setIsValid((byte) 0x00);
 
                 // 3. 重新将对象写回文件
-                randomAccessFile.seek(message.getOffsetBeg());
                 byte[] bufferDest = BinaryTool.toBytes(diskMessage);
+                randomAccessFile.seek(message.getOffsetBeg());
                 randomAccessFile.write(bufferDest);
             }
 
@@ -257,7 +257,7 @@ public class MessageFileManager {
 
     // 通过这个方法来真正的去完成垃圾回收
     // 大概过程就是建立新文件 将旧文件消息写入新文件 然后删除旧文件 重命名新文件之后也还要去更新状态文件
-    public void gs(MSGQueue queue) throws MqException, IOException, ClassNotFoundException {
+    public void gc(MSGQueue queue) throws MqException, IOException, ClassNotFoundException {
         // 这里要加锁 因为防止你垃圾回收的时候别的线程增加或删除消息搞出一些幺蛾子
         synchronized (queue) {
             long gcBeg = System.currentTimeMillis();

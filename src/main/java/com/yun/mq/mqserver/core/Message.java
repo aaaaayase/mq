@@ -2,6 +2,7 @@ package com.yun.mq.mqserver.core;
 
 
 import java.io.Serializable;
+import java.util.Arrays;
 import java.util.UUID;
 import java.util.prefs.BackingStoreException;
 import java.util.stream.IntStream;
@@ -117,5 +118,16 @@ public class Message implements Serializable {
 
     public void setIsValid(byte isValid) {
         this.isValid = isValid;
+    }
+
+    @Override
+    public String toString() {
+        return "Message{" +
+                "basicProperties=" + basicProperties +
+                ", body=" + Arrays.toString(body) +
+                ", offsetBeg=" + offsetBeg +
+                ", offsetEnd=" + offsetEnd +
+                ", isValid=" + isValid +
+                '}';
     }
 }
