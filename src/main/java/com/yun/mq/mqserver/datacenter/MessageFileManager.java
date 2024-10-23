@@ -5,6 +5,7 @@ import com.yun.mq.common.MqException;
 import com.yun.mq.mqserver.core.MSGQueue;
 import com.yun.mq.mqserver.core.Message;
 
+import javax.xml.crypto.Data;
 import java.io.*;
 import java.util.LinkedList;
 import java.util.Scanner;
@@ -68,7 +69,7 @@ public class MessageFileManager {
     }
 
     // 创建队列的消息目录以及文件
-    private void createQueueFiles(String queueName) throws IOException {
+    public void createQueueFiles(String queueName) throws IOException {
         // 1. 先创建队列的对应的消息目录
         File baseDir = new File(getQueueDir(queueName));
         if (!baseDir.exists()) {
@@ -105,7 +106,7 @@ public class MessageFileManager {
     }
 
     // 删除队列消息的目录以及文件
-    private void destroyQueueFiles(String queueName) throws IOException {
+    public void destroyQueueFiles(String queueName) throws IOException {
         File queueDataFile = new File(getQueueDataPath(queueName));
         boolean ok1 = queueDataFile.delete();
         File queueStatFile = new File(getQueueStatPath(queueName));
@@ -120,7 +121,7 @@ public class MessageFileManager {
     }
 
     // 检验队列的消息文件是否存在a
-    private boolean checkFilesExists(String queueName) {
+    public boolean checkFilesExists(String queueName) {
         File queueDataFile = new File(getQueueDataPath(queueName));
         if (!queueDataFile.exists()) {
             return false;
@@ -133,7 +134,7 @@ public class MessageFileManager {
     }
 
     // 将消息写入文件
-    private void sendMessage(MSGQueue queue, Message message) throws MqException, IOException {
+    public void sendMessage(MSGQueue queue, Message message) throws MqException, IOException {
         // 1. 验证要写入的文件是否存在
         if (!checkFilesExists(queue.getName())) {
             throw new MqException("[MessageFileManager] 队列对应的文件不存在！ queueName=" + queue.getName());
@@ -168,7 +169,7 @@ public class MessageFileManager {
     }
 
     // 删除消息
-    private void deleteMessage(MSGQueue queue, Message message) throws IOException, ClassNotFoundException {
+    public void deleteMessage(MSGQueue queue, Message message) throws IOException, ClassNotFoundException {
         synchronized (queue) {
             try (RandomAccessFile randomAccessFile = new RandomAccessFile(getQueueStatPath(queue.getName()), "rw")) {
                 // 1. 从文件中将相应message读取出来
@@ -197,6 +198,7 @@ public class MessageFileManager {
 
     }
 
+    // 加载所有有效对象
     // 加载对应队列中的消息到内存中 准确来说就是链表
     // 这里使用链表是为了方便操作
     // 这里的操作不需要加锁 因为这是在启动服务器时执行的操作 所以此时还没有用户请求不需要考虑冲突的情况
@@ -238,5 +240,79 @@ public class MessageFileManager {
         }
         return messages;
     }
+
+    // 检查队列消息的数据文件 判断此时是否需要GC
+    public boolean checkGC(String queueName) {
+        Stat stat = readStat(queueName);
+        if (stat.totalCount > 2000 && (double) stat.validCount / stat.totalCount < 0.5) {
+            return true;
+        }
+        return false;
+    }
+
+    // 获取新的队列数据文件的路径
+    public String getQueueDataNewPath(String queueName) {
+        return getQueueDir(queueName) + "queue_data_new.txt";
+    }
+
+    // 通过这个方法来真正的去完成垃圾回收
+    // 大概过程就是建立新文件 将旧文件消息写入新文件 然后删除旧文件 重命名新文件之后也还要去更新状态文件
+    public void gs(MSGQueue queue) throws MqException, IOException, ClassNotFoundException {
+        // 这里要加锁 因为防止你垃圾回收的时候别的线程增加或删除消息搞出一些幺蛾子
+        synchronized (queue) {
+            long gcBeg = System.currentTimeMillis();
+
+            // 1. 创建新文件
+            File queueDataNewFile = new File(getQueueDataNewPath(queue.getName()));
+            if (queueDataNewFile.exists()) {
+                throw new MqException("[MessageFileManager] gc 时发现该队列的queue_data_new已经存在！ queueName=" + queue.getName());
+            }
+
+            boolean ok = queueDataNewFile.createNewFile();
+            if (!ok) {
+                // 创建文件失败
+                throw new MqException("[MessageFileManager] 创建文件失败！ queueDataNewFile=" + queueDataNewFile.getAbsolutePath());
+            }
+
+            // 2. 读取队列消息数据文件中的内容
+            LinkedList<Message> messages = LoadAllMessageFromQueue(queue.getName());
+
+            // 3. 将队列中的对象写入新文件
+            try (OutputStream outputStream = new FileOutputStream(queueDataNewFile)) {
+                try (DataOutputStream dataOutputStream = new DataOutputStream(outputStream)) {
+                    for (Message message : messages) {
+                        byte[] buffer = BinaryTool.toBytes(message);
+                        dataOutputStream.writeInt(buffer.length);
+                        dataOutputStream.write(buffer);
+                    }
+                }
+            }
+
+            // 4. 删除旧文件
+            File queueDataOldFile = new File(getQueueDataPath(queue.getName()));
+            ok = queueDataOldFile.delete();
+            if (!ok) {
+                throw new MqException("[MessageFileManager] 删除旧文件失败！ queueDataOldFile=" + queueDataOldFile.getAbsolutePath());
+            }
+
+            // 5. 重命名新文件
+            ok = queueDataNewFile.renameTo(queueDataOldFile);
+            if (!ok) {
+                throw new MqException("[MessageFileManager] 文件重命名失败！ queueDataNewFile=" + queueDataNewFile.getAbsolutePath() + " queueDataOldFile=" + queueDataOldFile.getAbsolutePath());
+            }
+
+            // 6. 更新队列的消息统计文件
+            Stat stat = readStat(queue.getName());
+            stat.totalCount = messages.size();
+            stat.validCount = messages.size();
+            writeStat(queue.getName(), stat);
+
+            long gcEnd = System.currentTimeMillis();
+            System.out.println("[MessageFileManager] gc 执行完毕！ queueName=" + queue.getName() + " time=" + (gcEnd - gcBeg) + "ms");
+
+        }
+
+    }
+
 
 }
