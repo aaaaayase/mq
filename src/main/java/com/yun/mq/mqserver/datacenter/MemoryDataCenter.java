@@ -42,7 +42,7 @@ public class MemoryDataCenter {
     }
 
     // 获取交换机
-    public Exchange getExchang(String exchangeName) {
+    public Exchange getExchange(String exchangeName) {
         return exchangeMap.get(exchangeName);
     }
 
@@ -210,6 +210,12 @@ public class MemoryDataCenter {
 
     // 从硬盘中读取数据到内存中 可以理解成就是将硬盘中的数据赋给内存中的这些数据结构
     public void recovery(DiskDataCenter diskDataCenter) throws IOException, MqException, ClassNotFoundException {
+        // 0. 清空之前的所有数据
+        exchangeMap.clear();
+        queueMap.clear();
+        bindingsMap.clear();
+        messageMap.clear();
+        queueMessageMap.clear();
         // 1. 恢复交换机数据
         List<Exchange> exchanges = diskDataCenter.selectAllExchanges();
         for (Exchange exchange : exchanges) {
