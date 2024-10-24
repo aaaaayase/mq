@@ -24,6 +24,12 @@ public class MessageFileManager {
         public int validCount; // 队列中的有效消息的数量
     }
 
+    // 初始化
+    public void init() {
+        // 暂时为空 后面扩展再说
+    }
+
+
     // 这个方法获取指定队列对应的消息文件所在的路径
     private String getQueueDir(String queueName) {
         return "./data/" + queueName;
