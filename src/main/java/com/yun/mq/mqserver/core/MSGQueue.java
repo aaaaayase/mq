@@ -92,4 +92,8 @@ public class MSGQueue {
     public void setArguments(String key, Object object) {
         arguments.put(key, object);
     }
+
+    public void setArguments(Map<String, Object> arguments) {
+        this.arguments = arguments;
+    }
 }
