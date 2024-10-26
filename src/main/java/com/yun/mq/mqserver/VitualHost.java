@@ -10,6 +10,7 @@ import org.springframework.util.RouteMatcher;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @author yun
@@ -279,6 +280,89 @@ public class VitualHost {
             e.printStackTrace();
             return false;
         }
+
+    }
+
+    // 从指定交换机发送消息到队列
+    public boolean basicPublish(String exchangeName, String routingKey, BasicProperties basicProperties, byte[] body) {
+        exchangeName = virtualHostName + exchangeName;
+        try {
+            // 1. 检查routingKey是否合法
+            if (!router.checkRoutingKey(routingKey)) {
+                throw new MqException("[VirtualHost] routingKey不合法！ routingKey=" + routingKey);
+            }
+
+            // 2. 查找交换机对象
+            Exchange exchange = memoryDataCenter.getExchange(exchangeName);
+            if (exchange == null) {
+                throw new MqException("[VirtualHost] 交换机不存在！ exchangeName=" + exchangeName);
+            }
+
+            // 3. 判断交换机类型
+            if (exchange.getExchangeType() == ExchangeType.DIRECT) {
+                // 直接交换机 直接把routingKey当成队列名
+                String queueName = virtualHostName + routingKey;
+                // 获取队列对象
+                MSGQueue queue = memoryDataCenter.getQueue(queueName);
+                if (queue == null) {
+                    throw new MqException("[VirtualHost] 队列不存在！ queueName=" + queueName);
+                }
+
+                // 创建消息
+                Message message = Message.createMessageWithId(basicProperties, routingKey, body);
+
+                // 队列存在则直接将消息发送至队列
+                sendMessage(queue, message);
+
+            } else {
+                // 主题交换机以及扇出交换机
+                // 获取绑定对象
+                ConcurrentHashMap<String, Binding> bindingsMap = memoryDataCenter.getBindings(exchangeName);
+                for (Map.Entry<String, Binding> entry : bindingsMap.entrySet()) {
+                    Binding binding = entry.getValue();
+                    MSGQueue queue = memoryDataCenter.getQueue(binding.getQueueName());
+                    if (queue == null) {
+                        // 这里不抛异常了 因为不希望因为一个队列的失败而去影响到其它消息
+                        System.out.println("[VirtualHost] basicPublish发送消息时，发现队列不存在！ queueName=" + binding.getQueueName());
+                        continue;
+                    }
+
+                    // 创建消息
+                    Message message = Message.createMessageWithId(basicProperties, routingKey, body);
+                    // 检验消息是否能够发送到队列
+                    // fanout 消息要转发给所有绑定的队列
+                    // topic 消息发送只需要考虑bindingKey以及routingKey
+                    if (!router.route(exchange.getExchangeType(), binding, message)) {
+                        continue;
+                    }
+
+                    // 真正发消息给队列
+                    sendMessage(queue, message);
+
+                }
+
+            }
+
+            System.out.println("[VirtualHost] 消息发送完成！ exchangeName=" + exchangeName);
+            return true;
+        } catch (Exception e) {
+            System.out.println("[VirtualHost] 消息发送失败！ exchangeName=" + exchangeName);
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    private void sendMessage(MSGQueue queue, Message message) throws IOException, MqException {
+        int deliverMode = message.getDeliverMode();
+        // 判断是否要将消息写到硬盘上
+        if (deliverMode == 2) {
+            // 写入硬盘
+            diskDataCenter.sendMessage(queue, message);
+        }
+        // 写入内存
+        memoryDataCenter.sendMessage(queue, message);
+
+        // TODO 此处需要补充一个逻辑 提醒消费者可以消费消息了
 
     }
 
