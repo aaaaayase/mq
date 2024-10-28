@@ -4,9 +4,13 @@ package com.yun.mq.mqserver.core;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yun.mq.common.ConsumerEnv;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @author yun
@@ -28,6 +32,32 @@ public class MSGQueue {
     private boolean autoDelete = false;
 
     private Map<String, Object> arguments = new HashMap<>();
+
+    // 表示订阅队列的消费者
+    private List<ConsumerEnv> consumerEnvList = new ArrayList<>();
+
+    private AtomicInteger consumerSeq = new AtomicInteger(0);
+
+    // 添加一个新的订阅者
+    public void addConsumerEnv(ConsumerEnv consumerEnv) {
+        synchronized (this) {
+            consumerEnvList.add(consumerEnv);
+        }
+    }
+
+    // 删除一个订阅暂不考虑
+
+    // 挑选一个订阅者 用来处理当前的消息
+    public ConsumerEnv chooseConsumer() {
+        if (consumerEnvList.size() == 0) {
+            // 当前没有订阅者
+            return null;
+        }
+
+        int index = consumerSeq.get() % consumerEnvList.size();
+        consumerSeq.getAndIncrement();
+        return consumerEnvList.get(index);
+    }
 
     public String getName() {
         return name;

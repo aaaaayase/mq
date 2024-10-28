@@ -1,5 +1,6 @@
 package com.yun.mq.mqserver;
 
+import com.yun.mq.common.Consumer;
 import com.yun.mq.common.MqException;
 import com.yun.mq.mqserver.core.*;
 import com.yun.mq.mqserver.datacenter.DiskDataCenter;
@@ -364,6 +365,15 @@ public class VitualHost {
 
         // TODO 此处需要补充一个逻辑 提醒消费者可以消费消息了
 
+    }
+
+    // 订阅消息
+    // 添加一个队列的订阅者 当队列收到消息后 会将消息主动推送给对应的订阅者
+    // consumerTag 消费者标识
+    // autoAck 消息被消费后应答的方式 为true则是自动应答 为false则是需要手动应答
+    // consumer 一个回调函数 此处设为函数式接口 后续传实参可以传lambda
+    public boolean basicConsume(String consumeTag, String queueName, boolean autoAck, Consumer consumer) {
+        return true;
     }
 
 }
