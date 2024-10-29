@@ -40,9 +40,7 @@ public class MSGQueue {
 
     // 添加一个新的订阅者
     public void addConsumerEnv(ConsumerEnv consumerEnv) {
-        synchronized (this) {
-            consumerEnvList.add(consumerEnv);
-        }
+        consumerEnvList.add(consumerEnv);
     }
 
     // 删除一个订阅暂不考虑

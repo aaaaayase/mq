@@ -5,9 +5,7 @@ import com.yun.mq.common.MqException;
 import com.yun.mq.mqserver.core.*;
 import com.yun.mq.mqserver.datacenter.DiskDataCenter;
 import com.yun.mq.mqserver.datacenter.MemoryDataCenter;
-import org.apache.tomcat.util.security.Escape;
-import org.mybatis.spring.annotation.MapperScan;
-import org.springframework.util.RouteMatcher;
+import org.yaml.snakeyaml.reader.StreamReader;
 
 import java.io.IOException;
 import java.util.Map;
@@ -19,7 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @desciption: 虚拟主机类于数据库中的database的功能
  * 管理自己的交换机 绑定 消息以及队列
  */
-public class VitualHost {
+public class VirtualHost {
 
     // 主机名
     private String virtualHostName;
@@ -36,6 +34,9 @@ public class VitualHost {
 
     private Object queueLocker = new Object();
 
+    // VirtualHost类和ConsumerManager类相互调用
+    private ConsumerManager consumerManager = new ConsumerManager(this);
+
     public String getVitualName() {
         return virtualHostName;
     }
@@ -48,7 +49,7 @@ public class VitualHost {
         return memoryDataCenter;
     }
 
-    public VitualHost(String name) {
+    public VirtualHost(String name) {
         this.virtualHostName = name;
 
         // 对于MemoryFileManager来说不需要初始化 对象new出来即可
@@ -353,7 +354,7 @@ public class VitualHost {
         }
     }
 
-    private void sendMessage(MSGQueue queue, Message message) throws IOException, MqException {
+    private void sendMessage(MSGQueue queue, Message message) throws IOException, MqException, InterruptedException {
         int deliverMode = message.getDeliverMode();
         // 判断是否要将消息写到硬盘上
         if (deliverMode == 2) {
@@ -363,17 +364,62 @@ public class VitualHost {
         // 写入内存
         memoryDataCenter.sendMessage(queue, message);
 
-        // TODO 此处需要补充一个逻辑 提醒消费者可以消费消息了
+        // 此处需要补充一个逻辑 提醒消费者可以消费消息了
+        consumerManager.notifyConsume(queue.getName());
 
     }
 
-    // 订阅消息
+    // 订阅消息 为队列添加一个订阅的消费者
     // 添加一个队列的订阅者 当队列收到消息后 会将消息主动推送给对应的订阅者
     // consumerTag 消费者标识
     // autoAck 消息被消费后应答的方式 为true则是自动应答 为false则是需要手动应答
     // consumer 一个回调函数 此处设为函数式接口 后续传实参可以传lambda
     public boolean basicConsume(String consumeTag, String queueName, boolean autoAck, Consumer consumer) {
-        return true;
+        // 给队列名加前缀
+        queueName = virtualHostName + queueName;
+
+        try {
+            // 给相应队列添加订阅者
+            consumerManager.addConsumer(consumeTag, queueName, autoAck, consumer);
+            System.out.println("[VirtualHost] basicConsume 成功！ queueName=" + queueName);
+            return true;
+        } catch (Exception e) {
+            System.out.println("[VirtualHost] basicConsume 失败！ queueName=" + queueName);
+            e.printStackTrace();
+            return false;
+        }
+
+    }
+
+    // 手动应答
+    public boolean basicAck(String queueName, String messageId) {
+        queueName = virtualHostName + queueName;
+        try {
+            // 1. 取得队列
+            MSGQueue queue = memoryDataCenter.getQueue(queueName);
+            if (queue == null) {
+                throw new MqException("[VirtualHost] 要确认的队列不存在！ queueName=" + queueName);
+            }
+            // 2. 取得消息
+            Message message = memoryDataCenter.getMessage(messageId);
+            if (message == null) {
+                throw new MqException("[VirtualHost] 要确认的消息不存在！ messageId=" + messageId);
+            }
+            // 3. 删除硬盘上数据
+            if (message.getDeliverMode() == 2) {
+                diskDataCenter.deleteMessage(queue, message);
+            }
+            // 4. 删除待响应集合上的数据
+            memoryDataCenter.deleteMessageWaitAck(queueName, messageId);
+            // 5. 删除消息中心上的数据
+            memoryDataCenter.deleteMessage(messageId);
+            System.out.println("[VirtualHost] basicAck成功！消息被成功确认！ queueName=" + queueName + " messageId=" + messageId);
+            return true;
+        } catch (Exception e) {
+            System.out.println("[VirtualHost] basicAck失败！消息确认失败！ queueName=" + queueName + " messageId=" + messageId);
+            e.printStackTrace();
+            return false;
+        }
     }
 
 }
