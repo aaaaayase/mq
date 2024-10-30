@@ -44,7 +44,7 @@ public class ConsumerManager {
 
                     // 3. 判断队列是否存在
                     if (queue == null) {
-                        throw new MqException("[ConsumerManager] 取出队列名后发现，该队列不存在！ queueName=" + queueName);
+                        throw new MqException("[ConsumerManager] 取出队列名后发现，发现该队列不存在！ queueName=" + queueName);
                     }
 
                     // 4. 队列存在 那么就让消费者消费队列中的消息

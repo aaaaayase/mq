@@ -87,7 +87,7 @@ public class MemoryDataCenter {
             }
             bindingMap.put(binding.getQueueName(), binding);
         }
-        System.out.println("[MemoryDataCenter] 绑定插入成功！ exchangeName=" + binding.getExchangeName() + " queueName=" + binding.getQueueName());
+        System.out.println("[MemoryDataCenter] 绑定添加成功！ exchangeName=" + binding.getExchangeName() + " queueName=" + binding.getQueueName());
     }
 
     // 获取绑定 分别写两种方式的获取绑定的方法
@@ -119,7 +119,7 @@ public class MemoryDataCenter {
     // 添加消息
     public void addMessage(Message message) {
         messageMap.put(message.getMessageId(), message);
-        System.out.println("[MemoryDataCenter] 消息插入成功！ messageId=" + message.getMessageId());
+        System.out.println("[MemoryDataCenter] 消息添加成功！ messageId=" + message.getMessageId());
     }
 
     // 获取消息
@@ -163,7 +163,7 @@ public class MemoryDataCenter {
             }
 
             Message currentMessage = messages.remove(0);
-            System.out.println("[MemoryDataCenter] 消息从队列中取出！ messageId=" + currentMessage.getMessageId());
+            System.out.println("[MemoryDataCenter] 消息已从队列中取出！ messageId=" + currentMessage.getMessageId());
             return currentMessage;
         }
 
@@ -185,7 +185,7 @@ public class MemoryDataCenter {
     public void addMessageWaitAck(String queueName, Message message) {
         ConcurrentHashMap<String, Message> messageHashMap = queueMessageWaitAckMap.computeIfAbsent(queueName, k -> new ConcurrentHashMap<>());
         messageHashMap.put(message.getMessageId(), message);
-        System.out.println("[MemoryDataCenter] 消息进入待确认队列！ messageId=" + message.getMessageId());
+        System.out.println("[MemoryDataCenter] 消息已进入待确认队列！ messageId=" + message.getMessageId());
     }
 
     // 删除未确认的消息
@@ -195,7 +195,7 @@ public class MemoryDataCenter {
             return;
         }
         messageHashMap.remove(messageId);
-        System.out.println("[MemoryDataCenter] 已删除未确认的消息！ messageId=" + messageId);
+        System.out.println("[MemoryDataCenter] 消息从待确认队列删除！ messageId=" + messageId);
     }
 
     // 获取指定的未确认的消息

@@ -1,0 +1,38 @@
+package com.yun.mq.common;
+
+import java.io.Serializable;
+
+/**
+ * @author yun
+ * @date 2024/10/30 18:44
+ * @desciption: 创建绑定参数类
+ */
+public class queueBindArguments extends BasicArguments implements Serializable {
+    private String queueName;
+    private String exchangeName;
+    private String bindingKey;
+
+    public String getQueueName() {
+        return queueName;
+    }
+
+    public void setQueueName(String queueName) {
+        this.queueName = queueName;
+    }
+
+    public String getExchangeName() {
+        return exchangeName;
+    }
+
+    public void setExchangeName(String exchangeName) {
+        this.exchangeName = exchangeName;
+    }
+
+    public String getBindingKey() {
+        return bindingKey;
+    }
+
+    public void setBindingKey(String bindingKey) {
+        this.bindingKey = bindingKey;
+    }
+}
