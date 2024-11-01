@@ -7,7 +7,7 @@ import java.io.Serializable;
  * @date 2024/10/30 18:46
  * @desciption: 解除绑定参数类
  */
-public class queueUnbindArguments extends BasicArguments implements Serializable {
+public class QueueUnbindArguments extends BasicArguments implements Serializable {
 
     private String exchangeName;
     private String queueName;

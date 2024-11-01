@@ -8,7 +8,7 @@ import java.util.Map;
  * @date 2024/10/30 18:41
  * @desciption: 创建队列参数类
  */
-public class queueDeclareArguments extends BasicArguments implements Serializable {
+public class QueueDeclareArguments extends BasicArguments implements Serializable {
 
     private String queueName;
     private boolean durable;

@@ -7,7 +7,7 @@ import java.io.Serializable;
  * @date 2024/10/30 18:44
  * @desciption: 创建绑定参数类
  */
-public class queueBindArguments extends BasicArguments implements Serializable {
+public class QueueBindArguments extends BasicArguments implements Serializable {
     private String queueName;
     private String exchangeName;
     private String bindingKey;

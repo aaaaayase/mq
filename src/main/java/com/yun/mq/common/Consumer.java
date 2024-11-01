@@ -2,6 +2,8 @@ package com.yun.mq.common;
 
 import com.yun.mq.mqserver.core.BasicProperties;
 
+import java.io.IOException;
+
 /**
  * @author yun
  * @date 2024/10/28 15:57
@@ -10,5 +12,5 @@ import com.yun.mq.mqserver.core.BasicProperties;
 public interface Consumer {
 
     // 服务器收到消息 使用此方法将消息推送给相应的订阅用户
-    void handleDelivery(String consumerTag, BasicProperties basicProperties, byte[] body);
+    void handleDelivery(String consumerTag, BasicProperties basicProperties, byte[] body) throws IOException, MqException;
 }
